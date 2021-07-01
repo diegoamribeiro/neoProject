@@ -1,7 +1,9 @@
 import win32com.client as win32
 import matplotlib.pyplot as plt
+import pystan
 from pandas import DataFrame
 from matplotlib import pyplot
+from fbprophet import prophet
 import pandas as pd
 from pandas.plotting import autocorrelation_plot
 import warnings
@@ -10,22 +12,7 @@ import pandas.testing as tm
 from statsmodels.graphics.tsaplots import plot_acf
 from statsmodels.tsa.arima_model import ARIMA
 from statsmodels.graphics.tsaplots import plot_pacf
-
 import os
-
-warnings.filterwarnings("ignore")
-
-
-def difference(dataset, interval=1):
-    diff = list()
-    for i in range(interval, len(dataset)):
-        value = dataset[i] - dataset[i - interval]
-        diff.append(value)
-    return diff
-
-
-def inverse_difference(historic, prediction, interval=1):
-    return prediction + historic[-interval]
 
 
 attachment_dir = "anexos\\"
@@ -38,7 +25,7 @@ if not os.path.exists(path):
 path_file = 'Dados_de_empresas_ficticias.csv'
 
 file = pd.read_csv(path_file, sep=';', decimal='.', squeeze=True)
-file_2 = pd.read_csv("Dados_de_empresas_ficticias.csv",
+series = pd.read_csv("Dados_de_empresas_ficticias.csv",
                      sep=';', usecols=['Consumo 01/2020', 'Consumo 02/2020', 'Consumo 03/2020', 'Consumo 04/2020',
                      'Consumo 05/2020', 'Consumo 06/2020', 'Consumo 07/2020', 'Consumo 08/2020',
                      'Consumo 09/2020', 'Consumo 10/2020', 'Consumo 11/2020', 'Consumo 12/2020'])
@@ -47,7 +34,10 @@ dataframe = pd.DataFrame(file)
 
 
 consumo_futuro = []
-for i in range(0, len(file_2)):
+
+meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
+for i in range(0, len(series)):
     janeiro = float(dataframe['Consumo 01/2020'][i].replace(',', '.'))
     fevereiro = float(dataframe['Consumo 02/2020'][i].replace(',', '.'))
     marco = float(dataframe['Consumo 03/2020'][i].replace(',', '.'))
@@ -61,63 +51,38 @@ for i in range(0, len(file_2)):
     novembro = float(dataframe['Consumo 11/2020'][i].replace(',', '.'))
     dezembro = float(dataframe['Consumo 12/2020'][i].replace(',', '.'))
 
-    file_2['Consumo 01/2020'] = janeiro
-    file_2['Consumo 02/2020'] = fevereiro
-    file_2['Consumo 03/2020'] = marco
-    file_2['Consumo 04/2020'] = abril
-    file_2['Consumo 05/2020'] = maio
-    file_2['Consumo 06/2020'] = junho
-    file_2['Consumo 07/2020'] = julho
-    file_2['Consumo 08/2020'] = agosto
-    file_2['Consumo 09/2020'] = setembro
-    file_2['Consumo 10/2020'] = outubro
-    file_2['Consumo 11/2020'] = novembro
-    file_2['Consumo 12/2020'] = dezembro
+    series['Consumo 01/2020'] = janeiro
+    series['Consumo 02/2020'] = fevereiro
+    series['Consumo 03/2020'] = marco
+    series['Consumo 04/2020'] = abril
+    series['Consumo 05/2020'] = maio
+    series['Consumo 06/2020'] = junho
+    series['Consumo 07/2020'] = julho
+    series['Consumo 08/2020'] = agosto
+    series['Consumo 09/2020'] = setembro
+    series['Consumo 10/2020'] = outubro
+    series['Consumo 11/2020'] = novembro
+    series['Consumo 12/2020'] = dezembro
+
+split_point = len(series) - 12
+
+dataset = series[0:split_point]
+validation = series[split_point:]
 
 
-#consumo_futuro = [janeiro, fevereiro, marco, abril, maio, junho, julho, agosto, setembro,
-#                   outubro, novembro, dezembro]
+series = pd.read_csv('dataset.csv')
 
-# modelo = ARIMA(consumo_futuro, order=(0, 1, 1))
-#
-# modelo_fit = modelo.fit()
-#
-# # print(modelo_fit.summary())
-#
-# residuals = DataFrame(modelo_fit.resid)
-# residuals.plot()
-# residuals.plot(kind='kde')
-# pyplot.show()
+new_dataframe = pd.DataFrame({'ds': dataset.index, 'y': dataset.values})
+dataframe.head()
 
-# print(residuals.describe())
+model = Prophet()
+model.fit(new_dataframe)
 
-X = file_2.values
+futuro = model.make_future_dataframe(periods=12, freq='M')
 
-# print(X)
-X = X.astype('float32')
+saida = model.predict(futuro)
+saida[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail(7)
 
-# Divide a fonte de dados
-size = int(len(X) * 0.50)
-
-# Separa os dados de treino e teste
-train = X[0:size]
-test = X[size:]
-
-# controle de dados
-history = [x for x in train]
-
-# cria lista de previsões
-predictions = list()
-
-for t in range(len(test)):
-    meses_do_ano = 12
-    diff = difference(history, meses_do_ano)
-    modelo = ARIMA(diff, order=(1, 1, 1))
-    modelo_fit = modelo.fit(trend='nc', disp=0)
-
-# plot_acf(consumo_futuro, lags=11)
-# pyplot.show()
-# file_2.info()
 
 
 outlook = win32.Dispatch('outlook.application')
@@ -155,7 +120,7 @@ def send_email(destino, anexo):
 # send_email()
 
 
-meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
 
 for i in range(0, len(dataframe)):
     empresa = dataframe['Empresa'][i]
