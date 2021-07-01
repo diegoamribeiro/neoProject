@@ -1,5 +1,7 @@
 import win32com.client as win32
 import matplotlib.pyplot as plt
+from sklearn.metrics import mean_squared_error
+from math import sqrt
 import pystan
 from pandas import DataFrame
 from matplotlib import pyplot
@@ -83,6 +85,9 @@ futuro = model.make_future_dataframe(periods=12, freq='M')
 saida = model.predict(futuro)
 saida[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail(7)
 
+validation_df = pd.DataFrame({'ds': validation.index})
+saida = model.predict(validation_df)
+graphic = model.plot(saida)
 
 
 outlook = win32.Dispatch('outlook.application')
@@ -115,11 +120,6 @@ def send_email(destino, anexo):
         """
     custom_email.Attachments.Add(anexo)
     custom_email.Send()
-
-
-# send_email()
-
-
 
 
 for i in range(0, len(dataframe)):
